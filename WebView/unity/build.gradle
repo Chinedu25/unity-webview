@@ -14,27 +14,48 @@ android {
         consumerProguardFiles "consumer-rules.pro"
     }
 
+    packagingOptions {
+        exclude './libs/*.jar'
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
 }
 
+configurations {
+    all*.exclude module: 'classes'
+}
+
 dependencies {
 
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.8.0'
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    if (project.hasProperty('android.injected.build.model')) {
+        // Android Studio project. Exclude classes.jar
+        implementation(fileTree(dir: 'libs', include: ['*.jar'])) {
+            exclude '**/classes.jar'
+        }
+    } else {
+        // Command line build. Use unity-release-runtime.jar.
+        implementation fileTree(dir: 'libs', include: ['*.jar', 'unity-release-runtime.jar'])
+    }
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
+
+
+
 
 task copyPlugin(type: Copy){
     dependsOn assemble
@@ -42,3 +63,25 @@ task copyPlugin(type: Copy){
     into ('../../Unity/UnityWebView/Assets/Plugins/Android')
     include (project.name + '-release.aar')
 }
+
+task unzipAar(type: Copy) {
+    dependsOn copyPlugin
+    from zipTree('../../Unity/UnityWebView/Assets/Plugins/Android/' + project.name + '-release.aar')
+    into "$buildDir/" + project.name + "-release"
+}
+
+task deleteUnityRelease {
+    dependsOn unzipAar
+    doLast {
+        delete fileTree(dir: "$buildDir/" + project.name + "-release/libs", include: 'classes.jar')
+    }
+}
+
+task repackageAar(type: Zip) {
+    dependsOn deleteUnityRelease
+    archiveFileName = project.name + "-release.aar"
+    destinationDirectory = file("../../Unity/UnityWebView/Assets/Plugins/Android")
+    from ("$buildDir/" + project.name + "-release")
+}
+
+assemble.finalizedBy repackageAar
