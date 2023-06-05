@@ -7,6 +7,6 @@ public class WebViewExample : MonoBehaviour
     void Start()
     {
         webViewQuad = GetComponent<WebViewQuad>();
-        webViewQuad.LoadUrl("http://www.google.com");
+        webViewQuad.LoadUrl("https://www.google.com");
     }
 }

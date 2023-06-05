@@ -1,5 +1,5 @@
-using System.Collections;
 using System.Collections.Generic;
+using System;
 using UnityEngine;
 
 public class WebViewQuad : MonoBehaviour
@@ -10,14 +10,31 @@ public class WebViewQuad : MonoBehaviour
 
     void Start()
     {
-        webViewPlugin = new AndroidJavaObject("com.morphyn.unity.WebViewPlugin", 1024, 768);
-        webViewTexture = new Texture2D(1024, 768, TextureFormat.ARGB32, false);
-        GetComponent<Renderer>().material.mainTexture = webViewTexture;
-    }
+        try
+        {
+            webViewPlugin = new AndroidJavaObject("com.morphyn.unity.WebViewPlugin", 1024, 768);
+            webViewTexture = new Texture2D(1024, 768, TextureFormat.ARGB32, false);
+            var renderer = GetComponent<Renderer>();
+            if (renderer == null)
+            {
+                Debug.Log("Failed to get Renderer");
+            }
+            else
+            {
+                renderer.material.mainTexture = webViewTexture;
+                Debug.Log("Texture applied to Renderer");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogException(e);
+        }
+    
+}
 
     void Update()
     {
-        // Process the main thread queue
+        //Process the main thread queue
         while (executeOnMainThread.Count > 0)
         {
             executeOnMainThread.Dequeue().Invoke();
@@ -36,9 +53,18 @@ public class WebViewQuad : MonoBehaviour
         // get the updated WebView bitmap
         AndroidJavaObject webViewBitmap = webViewPlugin.Call<AndroidJavaObject>("getWebViewBitmap");
 
-        // convert the Android Bitmap to a Unity Texture2D
-        byte[] bitmapData = webViewBitmap.Call<byte[]>("compressToJpeg", 100);
-        webViewTexture.LoadImage(bitmapData);
+        if (webViewBitmap != null)
+        {
+            // convert the Android Bitmap to a Unity Texture2D
+            sbyte[] bitmapData = webViewPlugin.Call<sbyte[]>("compressToJpeg", 100);
+            byte[] bitmapDataByte = Array.ConvertAll(bitmapData, b => unchecked((byte)b));
+
+            webViewTexture.LoadImage(bitmapDataByte);
+        }
+        else
+        {
+            Debug.Log("Cant find webViewBitmap");
+        }
     }
 
     public void LoadUrl(string url)
