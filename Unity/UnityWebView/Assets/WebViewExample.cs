@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 public class WebViewExample : MonoBehaviour
@@ -7,6 +8,14 @@ public class WebViewExample : MonoBehaviour
     void Start()
     {
         webViewQuad = GetComponent<WebViewQuad>();
-        webViewQuad.LoadUrl("https://www.google.com");
+
+        StartCoroutine(waitToOpen());
+
+    }
+
+    IEnumerator waitToOpen()
+    {
+        yield return new WaitForSeconds(1);
+        webViewQuad.LoadUrl("https://www.youtube.com/watch?v=5AKl_cEB26c");
     }
 }

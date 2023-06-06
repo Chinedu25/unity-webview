@@ -1,48 +1,123 @@
 package com.morphyn.unity;
 
+import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
+import android.graphics.Bitmap.CompressFormat;
+import android.graphics.ImageFormat;
+import android.graphics.PixelFormat;
+import android.graphics.Rect;
+import android.hardware.display.DisplayManager;
+import android.hardware.display.VirtualDisplay;
+import android.media.Image;
+import android.media.ImageReader;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.View;
+import android.os.Bundle;
 import android.util.Log;
+import android.view.Display;
+import android.view.MotionEvent;
+import android.view.View;
+import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.app.Presentation;
+import android.view.WindowManager;
 import com.unity3d.player.UnityPlayer;
-
+import android.os.SystemClock;
+import java.nio.ByteBuffer;
 import java.io.ByteArrayOutputStream;
 
 public class WebViewPlugin {
     private WebView webView;
-    private Bitmap webViewBitmap;
     private Handler mainThreadHandler;
-    private boolean isWebViewReady;
-
-    private  static  final String  LOGTAG = "MorphynWebView";
+    private ImageReader imageReader;
+    private VirtualDisplay virtualDisplay;
+    private Presentation presentation;
+    private static final String LOGTAG = "MorphynWebView";
 
     public WebViewPlugin(final int width, final int height) {
-
         Log.i(LOGTAG, "Started plugin WebView");
         mainThreadHandler = new Handler(Looper.getMainLooper());
-
 
         mainThreadHandler.post(new Runnable() {
             @Override
             public void run() {
-                webView = new WebView(UnityPlayer.currentActivity);
-                webView.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
-                webView.layout(0, 0, webView.getMeasuredWidth(), webView.getMeasuredHeight());
-                webViewBitmap = Bitmap.createBitmap(webView.getMeasuredWidth(), webView.getMeasuredHeight(), Bitmap.Config.ARGB_8888);
+                Context context = UnityPlayer.currentActivity;
+
+                webView = new WebView(context);
+                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                webView.getSettings().setJavaScriptEnabled(true);
+                webView.setWebChromeClient(new WebChromeClient());
 
                 webView.setWebViewClient(new WebViewClient() {
                     @Override
                     public void onPageFinished(WebView view, String url) {
-                        isWebViewReady = true;
-                        Canvas canvas = new Canvas(webViewBitmap);
-                        view.draw(canvas);
                         Log.i(LOGTAG, "Page load finished");
                     }
                 });
+
+                imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
+
+                DisplayManager displayManager = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
+                virtualDisplay = displayManager.createVirtualDisplay(
+                        "WebViewCapture",
+                        width,
+                        height,
+                        context.getResources().getDisplayMetrics().densityDpi,
+                        imageReader.getSurface(),
+                        0
+                );
+
+                presentation = new Presentation(context, virtualDisplay.getDisplay()) {
+                    @Override
+                    protected void onCreate(Bundle savedInstanceState) {
+                        super.onCreate(savedInstanceState);
+
+                        setContentView(webView);
+                    }
+                };
+
+                presentation.show();
+            }
+        });
+    }
+
+    public Bitmap getWebViewBitmap() {
+        Image image = imageReader.acquireLatestImage();
+        if (image != null) {
+            final Image.Plane[] planes = image.getPlanes();
+            final ByteBuffer buffer = planes[0].getBuffer();
+            int pixelStride = planes[0].getPixelStride();
+            int rowStride = planes[0].getRowStride();
+            int rowPadding = rowStride - pixelStride * image.getWidth();
+
+            Bitmap bitmap = Bitmap.createBitmap(image.getWidth() + rowPadding / pixelStride, image.getHeight(), Bitmap.Config.ARGB_8888);
+            bitmap.copyPixelsFromBuffer(buffer);
+
+            image.close();
+            return bitmap;
+        }
+        return null;
+    }
+
+    public byte[] compressToJpeg(Bitmap bitmap, int quality) {
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        bitmap.compress(CompressFormat.JPEG, quality, byteArrayOutputStream);
+        return byteArrayOutputStream.toByteArray();
+    }
+
+    public void clickAt(final float u, final float v) {
+        mainThreadHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                // Convert the normalized coordinates to WebView pixel coordinates
+                int x = (int) (u * webView.getMeasuredWidth());
+                int y = (int) (v * webView.getMeasuredHeight());
+
+                // Dispatch a synthetic mouse down and mouse up event
+                long time = SystemClock.uptimeMillis();
+                webView.dispatchTouchEvent(MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, x, y, 0));
+                webView.dispatchTouchEvent(MotionEvent.obtain(time, time, MotionEvent.ACTION_UP, x, y, 0));
             }
         });
     }
@@ -57,18 +132,9 @@ public class WebViewPlugin {
         });
     }
 
-    public Bitmap getWebViewBitmap() {
-        return webViewBitmap;
-    }
-
-    public byte[] compressToJpeg(int quality) {
-        Log.i(LOGTAG, "getting jpeg");
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        webViewBitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream);
-        return stream.toByteArray();
-    }
-
-    public boolean isWebViewReady() {
-        return isWebViewReady;
+    public void destroy() {
+        presentation.dismiss();
+        virtualDisplay.release();
+        imageReader.close();
     }
 }

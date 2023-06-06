@@ -12,25 +12,15 @@ public class WebViewQuad : MonoBehaviour
     {
         try
         {
-            webViewPlugin = new AndroidJavaObject("com.morphyn.unity.WebViewPlugin", 1024, 768);
-            webViewTexture = new Texture2D(1024, 768, TextureFormat.ARGB32, false);
-            var renderer = GetComponent<Renderer>();
-            if (renderer == null)
-            {
-                Debug.Log("Failed to get Renderer");
-            }
-            else
-            {
-                renderer.material.mainTexture = webViewTexture;
-                Debug.Log("Texture applied to Renderer");
-            }
+            webViewPlugin = new AndroidJavaObject("com.morphyn.unity.WebViewPlugin", Screen.width, Screen.height);
+            webViewTexture = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
+            GetComponent<Renderer>().material.mainTexture = webViewTexture;
         }
         catch (Exception e)
         {
             Debug.LogException(e);
         }
-    
-}
+    }
 
     void Update()
     {
@@ -40,30 +30,42 @@ public class WebViewQuad : MonoBehaviour
             executeOnMainThread.Dequeue().Invoke();
         }
 
-        // Check if the WebView is ready to display
-        bool isWebViewReady = webViewPlugin.Call<bool>("isWebViewReady");
-        if (isWebViewReady)
-        {
-            UpdateWebViewTexture();
-        }
-    }
+        HandleWebViewTouch();
 
-    private void UpdateWebViewTexture()
-    {
-        // get the updated WebView bitmap
         AndroidJavaObject webViewBitmap = webViewPlugin.Call<AndroidJavaObject>("getWebViewBitmap");
 
         if (webViewBitmap != null)
         {
-            // convert the Android Bitmap to a Unity Texture2D
-            sbyte[] bitmapData = webViewPlugin.Call<sbyte[]>("compressToJpeg", 100);
-            byte[] bitmapDataByte = Array.ConvertAll(bitmapData, b => unchecked((byte)b));
-
-            webViewTexture.LoadImage(bitmapDataByte);
+            byte[] bitmapData = webViewPlugin.Call<byte[]>("compressToJpeg", webViewBitmap, 100);
+            webViewTexture.LoadImage(bitmapData);
         }
-        else
+    }
+
+    private void HandleWebViewTouch()
+    {
+        if (Input.GetMouseButtonDown(0))
         {
-            Debug.Log("Cant find webViewBitmap");
+            // Create a ray from the mouse click position
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+
+            // Perform the raycast
+            RaycastHit hit;
+            if (Physics.Raycast(ray, out hit))
+            {
+                // Check if the hit was the quad with the WebView
+                if (hit.collider.gameObject == gameObject)
+                {
+                    // Transform the hit point from world space to local space
+                    Vector3 localHitPoint = transform.InverseTransformPoint(hit.point);
+
+                    // Transform the local coordinates to the range [0, 1]
+                    float u = localHitPoint.x / transform.localScale.x + 0.5f;
+                    float v = localHitPoint.y / transform.localScale.y + 0.5f;
+
+                    // Pass the normalized coordinates to the Android plugin
+                    webViewPlugin.Call("clickAt", u, v);
+                }
+            }
         }
     }
 
