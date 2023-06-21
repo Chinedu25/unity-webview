@@ -43,28 +43,42 @@ public class WebViewQuad : MonoBehaviour
 
     private void HandleWebViewTouch()
     {
-        if (Input.GetMouseButtonDown(0))
+        // Create a ray from the mouse click position
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+
+        // Perform the raycast
+        RaycastHit hit;
+        if (Physics.Raycast(ray, out hit))
         {
-            // Create a ray from the mouse click position
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-
-            // Perform the raycast
-            RaycastHit hit;
-            if (Physics.Raycast(ray, out hit))
+            // Check if the hit was the quad with the WebView
+            if (hit.collider.gameObject == gameObject)
             {
-                // Check if the hit was the quad with the WebView
-                if (hit.collider.gameObject == gameObject)
+                // Transform the hit point from world space to local space
+                Vector3 localHitPoint = transform.InverseTransformPoint(hit.point);
+
+                // Transform the local coordinates to the range [0, 1]
+                float u = localHitPoint.x / transform.localScale.x + 0.5f;
+                float v = 1f - (localHitPoint.y / transform.localScale.y + 0.5f); // Invert the y-axis
+
+                // Pass the normalized coordinates to the Android plugin
+                //if (Input.GetMouseButton(0))
+                //{
+                //    webViewPlugin.Call("clickAt", u, v);
+                //}
+
+                if (Input.GetMouseButtonDown(0))
                 {
-                    // Transform the hit point from world space to local space
-                    Vector3 localHitPoint = transform.InverseTransformPoint(hit.point);
-
-                    // Transform the local coordinates to the range [0, 1]
-                    float u = localHitPoint.x / transform.localScale.x + 0.5f;
-                    float v = localHitPoint.y / transform.localScale.y + 0.5f;
-
-                    // Pass the normalized coordinates to the Android plugin
-                    webViewPlugin.Call("clickAt", u, v);
+                    webViewPlugin.Call("dragStart", u, v);
                 }
+                else if (Input.GetMouseButton(0))
+                {
+                    webViewPlugin.Call("dragTo", u, v);
+                }
+                else if (Input.GetMouseButtonUp(0))
+                {
+                    webViewPlugin.Call("dragEnd", u, v);
+                }
+
             }
         }
     }

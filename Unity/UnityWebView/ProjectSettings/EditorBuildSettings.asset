@@ -6,6 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 74525a13338ea9d4794bd194789211a8
+    path: Assets/MorphynWebView/ExampleCanvas.unity
+    guid: b81f8a672d1ae344fb823451249efc13
   m_configObjects: {}

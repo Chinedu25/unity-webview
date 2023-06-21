@@ -99,6 +99,41 @@ public class WebViewPlugin {
         }
         return null;
     }
+    public void dragStart(final float u, final float v) {
+        mainThreadHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                int x = (int) (u * webView.getMeasuredWidth());
+                int y = (int) (v * webView.getMeasuredHeight());
+                long time = SystemClock.uptimeMillis();
+                webView.dispatchTouchEvent(MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, x, y, 0));
+            }
+        });
+    }
+
+    public void dragTo(final float u, final float v) {
+        mainThreadHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                int x = (int) (u * webView.getMeasuredWidth());
+                int y = (int) (v * webView.getMeasuredHeight());
+                long time = SystemClock.uptimeMillis();
+                webView.dispatchTouchEvent(MotionEvent.obtain(time, time, MotionEvent.ACTION_MOVE, x, y, 0));
+            }
+        });
+    }
+
+    public void dragEnd(final float u, final float v) {
+        mainThreadHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                int x = (int) (u * webView.getMeasuredWidth());
+                int y = (int) (v * webView.getMeasuredHeight());
+                long time = SystemClock.uptimeMillis();
+                webView.dispatchTouchEvent(MotionEvent.obtain(time, time, MotionEvent.ACTION_UP, x, y, 0));
+            }
+        });
+    }
 
     public byte[] compressToJpeg(Bitmap bitmap, int quality) {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
